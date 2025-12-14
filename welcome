@@ -90,211 +90,18 @@
 
 <script>
     // --- CONFIGURACIÓN ---
+    // REEMPLAZA ESTO CON TUS ENLACES REALES
     const scriptURL = 'TU_URL_LARGA_DE_APPS_SCRIPT_AQUI'; 
-    const hojaCSV = 'TU_ENLACE_CSV_GOOGLE_SHEETS'; // Si está vacío, usa datos de prueba
+    const hojaCSV = 'TU_ENLACE_CSV_GOOGLE_SHEETS'; 
 
-    // Datos de prueba por si no conectas la hoja todavía
+    // Datos de prueba corregidos (agregué la coma faltante en Fresa)
     const datosPrueba = [
         {nombre: "Mix de semillas (45 gr)", precio: 16, descripcion: "Semillas y arandano"},
         {nombre: "Pistaches (40 gr)", precio: 16, descripcion: "Horneados con sal de mar"},
         {nombre: "Arándanos (40 g)", precio: 12, descripcion: "Deshidratados"},
         {nombre: "Mango (40 g)", precio: 95, descripcion: "Con cáscara y sal"},
-        {nombre: "Fresa (40 g)", precio: 30, descripcion: "Pelada natural"}
+        {nombre: "Fresa (40 g)", precio: 30, descripcion: "Pelada natural"}, 
         {nombre: "Pasa con chocolate (40 g)", precio: 30, descripcion: "Pelada natural"}
-    ];
-
-    let globalProducts = [];
-    let cart = []; // Array de objetos: {name, price, qty, subtotal}
-
-    // 1. INICIAR
-    window.onload = async function() {
-        if(hojaCSV === 'TU_ENLACE_CSV_GOOGLE_SHEETS' || hojaCSV === '') {
-            globalProducts = datosPrueba;
-            renderTable(globalProducts);
-        } else {
-            try {
-                const response = await fetch(hojaCSV);
-                const data = await response.text();
-                globalProducts = parseCSV(data);
-                renderTable(globalProducts);
-            } catch (err) {
-                console.error(err);
-                document.getElementById('loading').innerText = "Error cargando. Usando modo prueba.";
-                globalProducts = datosPrueba;
-                renderTable(globalProducts);
-            }
-        }
-    };
-
-    // 2. LEER CSV
-    function parseCSV(csvText) {
-        const lines = csvText.split('\n');
-        const products = [];
-        for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (line) {
-                // Maneja comas dentro de comillas si fuera necesario, aquí simple:
-                const parts = line.split(','); 
-                if(parts.length >= 2) {
-                    products.push({
-                        nombre: parts[0],
-                        precio: parseFloat(parts[1]),
-                        descripcion: parts[2] || ''
-                    });
-                }
-            }
-        }
-        return products;
-    }
-
-    // 3. DIBUJAR TABLA
-    function renderTable(list) {
-        const tbody = document.getElementById('product-list-body');
-        document.getElementById('loading').style.display = 'none';
-        
-        tbody.innerHTML = list.map((p, index) => `
-            <tr>
-                <td>
-                    <strong>${p.nombre}</strong><br>
-                    <small style="color:#777;">${p.descripcion}</small>
-                </td>
-                <td>$${p.precio}</td>
-                <td>
-                    <input type="number" id="qty-${index}" class="qty-input" value="1" min="1">
-                </td>
-                <td>
-                    <button class="add-btn" onclick="addToCart(${index})">Agregar</button>
-                </td>
-            </tr>
-        `).join('');
-    }
-
-    // 4. AGREGAR AL CARRITO (CON CANTIDAD)
-    function addToCart(index) {
-        const product = globalProducts[index];
-        const qtyInput = document.getElementById(`qty-${index}`);
-        const quantity = parseInt(qtyInput.value);
-
-        if(quantity < 1) return;
-
-        // Buscar si ya existe en el carrito para sumarlo
-        const existingItem = cart.find(item => item.name === product.nombre);
-
-        if(existingItem) {
-            existingItem.qty += quantity;
-            existingItem.subtotal = existingItem.qty * existingItem.price;
-        } else {
-            cart.push({
-                name: product.nombre,
-                price: product.precio,
-                qty: quantity,
-                subtotal: quantity * product.precio
-            });
-        }
-
-        // Efecto visual (reinicia el input a 1)
-        qtyInput.value = 1; 
-        updateCartUI();
-    }
-
-    // 5. ACTUALIZAR VISTA DEL CARRITO
-    function updateCartUI() {
-        const container = document.getElementById('cart-content');
-        const totalDisplay = document.getElementById('total-display');
-        
-        if(cart.length === 0) {
-            container.innerHTML = "Aún no has agregado productos.";
-            totalDisplay.innerText = "0.00";
-            return;
-        }
-
-        let html = '<ul style="padding-left:20px; margin:0;">';
-        let grandTotal = 0;
-
-        cart.forEach((item, idx) => {
-            grandTotal += item.subtotal;
-            html += `
-                <li style="margin-bottom: 5px;">
-                    <strong>${item.name}</strong> (x${item.qty}) - $${item.subtotal}
-                    <a href="#" onclick="removeItem(${idx})" style="color:red; margin-left:10px; text-decoration:none; font-size:0.8em;">[Borrar]</a>
-                </li>
-            `;
-        });
-        html += '</ul>';
-
-        container.innerHTML = html;
-        totalDisplay.innerText = grandTotal.toFixed(2);
-    }
-
-    function removeItem(index) {
-        cart.splice(index, 1);
-        updateCartUI();
-    }
-
-    // 6. ENVIAR PEDIDO A GOOGLE SHEETS
-    function sendOrder(e) {
-        e.preventDefault();
-        if(cart.length === 0) { alert("Tu carrito está vacío."); return; }
-
-        const btn = document.getElementById('submit-btn');
-        const msg = document.getElementById('status-message');
-        
-        btn.disabled = true; 
-        btn.innerText = "Enviando...";
-        msg.style.display = 'none';
-
-        // Formato limpio para la celda de Excel: "Producto (x3), Otro (x1)"
-        const itemsString = cart.map(i => `${i.name} (x${i.qty})`).join(", ");
-        const finalTotal = document.getElementById('total-display').innerText;
-
-        const formData = {
-            nombre: document.getElementById('nombre').value,
-            direccion: document.getElementById('direccion').value,
-            fechaEntrega: document.getElementById('fecha').value,
-            items: itemsString,
-            total: finalTotal
-        };
-
-        fetch(scriptURL, {
-            method: 'POST',
-            body: JSON.stringify(formData)
-        })
-        .then(res => {
-            msg.className = "success";
-            msg.innerText = "✅ ¡Pedido enviado correctamente!";
-            msg.style.display = "block";
-            
-            // Resetear todo
-            cart = []; updateCartUI();
-            document.getElementById('order-form').reset();
-            btn.innerText = "Confirmar Pedido";
-            btn.disabled = false;
-        })
-        .catch(err => {
-            console.error(err);
-            msg.className = "error";
-            msg.innerText = "❌ Error de conexión. Intenta de nuevo.";
-            msg.style.display = "block";
-            btn.innerText = "Reintentar";
-            btn.disabled = false;
-        });
-    }
-</script>
-
-</body>
-</html>
-<script>
-    // --- CONFIGURACIÓN ---
-    const scriptURL = 'TU_URL_LARGA_DE_APPS_SCRIPT_AQUI'; 
-    const hojaCSV = 'TU_ENLACE_CSV_GOOGLE_SHEETS'; 
-
-    // Datos de prueba (Nota: asegúrate de que el nombre diga 'Pistache' tal cual)
-    const datosPrueba = [
-        {nombre: "Nuez de la India (250g)", precio: 110, descripcion: "Sin sal, horneada"},
-        {nombre: "Almendras Enteras (250g)", precio: 85, descripcion: "Naturales"},
-        {nombre: "Arándanos (250g)", precio: 45, descripcion: "Deshidratados"},
-        {nombre: "Pistaches (200g)", precio: 95, descripcion: "Con cáscara y sal"},
-        {nombre: "Semilla de Girasol (200g)", precio: 30, descripcion: "Pelada natural"}
     ];
 
     let globalProducts = [];
@@ -313,6 +120,7 @@
                 renderTable(globalProducts);
             } catch (err) {
                 console.error(err);
+                document.getElementById('loading').innerText = "Error cargando. Usando modo prueba.";
                 globalProducts = datosPrueba;
                 renderTable(globalProducts);
             }
@@ -367,15 +175,11 @@
         
         // REGLA: Si es Pistache Y son 20 o más
         if (nombreMin.includes("pistache") && cantidad >= 20) {
-            // Aplicamos descuento del 9.4%
-            // Matemáticamente: Precio * (1 - 0.094)
             return {
                 precioUnitario: precioBase * (1 - 0.094),
                 tieneDescuento: true
             };
         }
-        
-        // Si no cumple, precio normal
         return {
             precioUnitario: precioBase,
             tieneDescuento: false
@@ -390,14 +194,10 @@
 
         if(quantityToAdd < 1) return;
 
-        // Verificar si ya existe en el carrito
         const existingItemIndex = cart.findIndex(item => item.name === product.nombre);
 
         if(existingItemIndex !== -1) {
-            // Si ya existe, sumamos la cantidad nueva a la que ya tenía
             cart[existingItemIndex].qty += quantityToAdd;
-            
-            // Recalculamos el precio por si ahora ya superó las 20 piezas
             const calculo = calcularPrecioFinal(product.nombre, product.precio, cart[existingItemIndex].qty);
             
             cart[existingItemIndex].unitPrice = calculo.precioUnitario;
@@ -405,20 +205,16 @@
             cart[existingItemIndex].subtotal = cart[existingItemIndex].qty * calculo.precioUnitario;
 
         } else {
-            // Si es nuevo
             const calculo = calcularPrecioFinal(product.nombre, product.precio, quantityToAdd);
-            
             cart.push({
                 name: product.nombre,
-                originalPrice: product.precio, // Guardamos precio original por referencia
+                originalPrice: product.precio, 
                 unitPrice: calculo.precioUnitario,
                 qty: quantityToAdd,
                 subtotal: quantityToAdd * calculo.precioUnitario,
                 discounted: calculo.tieneDescuento
             });
         }
-
-        // Efecto visual
         qtyInput.value = 1; 
         updateCartUI();
     }
@@ -439,8 +235,6 @@
 
         cart.forEach((item, idx) => {
             grandTotal += item.subtotal;
-            
-            // Si tiene descuento, mostramos un mensaje verde
             const etiquetaDescuento = item.discounted 
                 ? `<span style="color:#28a745; font-weight:bold; font-size:0.8em;">(Desc. Mayoreo 9.4%)</span>` 
                 : '';
@@ -476,7 +270,6 @@
         btn.innerText = "Enviando...";
         msg.style.display = 'none';
 
-        // Creamos una lista detallada para que tú veas si se aplicó descuento en el Excel
         const itemsString = cart.map(i => {
             let info = `${i.name} (x${i.qty})`;
             if(i.discounted) info += " [DESC APLICADO]";
@@ -516,3 +309,5 @@
         });
     }
 </script>
+</body>
+</html>
