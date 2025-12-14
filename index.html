@@ -9,7 +9,7 @@
         body { font-family: 'Helvetica', sans-serif; background: var(--bg); color: #333; margin: 0; padding: 20px; }
         .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         
-        /* ENCABEZADO CON LOGO A LA IZQUIERDA */
+        /* ENCABEZADO */
         header { 
             display: flex;            
             align-items: center;      
@@ -30,7 +30,7 @@
 
         h1 { color: var(--primary); margin-bottom: 5px; }
 
-        /* MODO CELULAR (LOGO ARRIBA) */
+        /* MODO CELULAR */
         @media (max-width: 600px) {
             header {
                 flex-direction: column; 
@@ -38,12 +38,12 @@
             }
         }
         
-        /* ESTILOS DE LA TABLA (LISTA) */
+        /* TABLA */
         .product-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
         .product-table th { text-align: left; padding: 12px; border-bottom: 2px solid var(--primary); color: var(--primary); }
         .product-table td { padding: 15px 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
         
-        /* Inputs y Botones pequeños */
+        /* Inputs y Botones */
         .qty-input { width: 60px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-align: center; }
         .add-btn { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 0.9em; }
         .add-btn:hover { opacity: 0.9; }
@@ -71,4 +71,268 @@
         <div>
             <h1 style="margin:0; font-size: 1.8em;">Semillas & Snacks</h1>
             <p style="margin:5px 0 0 0; color: #666;">Catálogo de Mayoreo</p>
-            <p style="margin:5px 0 0 0;
+            <p style="margin:5px 0 0 0; font-size: 0.8em; color: #888;">Calidad y rentabilidad garantizada 🔶</p>
+        </div>
+    </header>
+
+    <div id="loading" style="text-align:center; color:#888;">Cargando lista...</div>
+    
+    <table class="product-table">
+        <thead>
+            <tr>
+                <th width="50%">Producto</th>
+                <th width="20%">Precio</th>
+                <th width="15%">Cant.</th>
+                <th width="15%">Acción</th>
+            </tr>
+        </thead>
+        <tbody id="product-list-body">
+            </tbody>
+    </table>
+
+    <form id="order-form" class="order-section" onsubmit="sendOrder(event)">
+        <h2>🛒 Resumen del Pedido</h2>
+        <div id="cart-content" style="color: #666; font-style: italic; margin-bottom: 15px;">
+            Aún no has agregado productos.
+        </div>
+        
+        <p style="text-align: right; font-size: 1.3em; margin-top:0;">Total a Pagar: <strong>$<span id="total-display">0.00</span></strong></p>
+        <hr>
+
+        <div class="form-group">
+            <input type="text" id="nombre" placeholder="Nombre completo del cliente" required>
+        </div>
+        <div class="form-group">
+            <input type="text" id="direccion" placeholder="Dirección de entrega" required>
+        </div>
+        <div class="form-group">
+            <label style="font-size:0.9em; color:#666;">Fecha de entrega:</label>
+            <input type="date" id="fecha" required>
+        </div>
+
+        <button type="submit" id="submit-btn" class="main-btn">Confirmar Pedido</button>
+        <div id="status-message"></div>
+    </form>
+</div>
+
+<script>
+    // --- CONFIGURACIÓN ---
+    // ¡IMPORTANTE! Vuelve a poner tus enlaces aquí
+    const scriptURL = 'TU_URL_LARGA_DE_APPS_SCRIPT_AQUI'; 
+    const hojaCSV = 'TU_ENLACE_CSV_GOOGLE_SHEETS'; 
+
+    // Datos de prueba (Por si no hay enlace CSV)
+    const datosPrueba = [
+        {nombre: "Mix de semillas (45 gr)", precio: 16, descripcion: "Semillas y arandano"},
+        {nombre: "Pistaches (40 gr)", precio: 16, descripcion: "Horneados con sal de mar"},
+        {nombre: "Arándanos (40 g)", precio: 12, descripcion: "Deshidratados"},
+        {nombre: "Mango (40 g)", precio: 95, descripcion: "Con cáscara y sal"},
+        {nombre: "Fresa (40 g)", precio: 30, descripcion: "Pelada natural"}, 
+        {nombre: "Pasa con chocolate (40 g)", precio: 30, descripcion: "Pelada natural"}
+    ];
+
+    let globalProducts = [];
+    let cart = [];
+
+    // 1. INICIAR
+    window.onload = async function() {
+        if(hojaCSV === 'TU_ENLACE_CSV_GOOGLE_SHEETS' || hojaCSV === '') {
+            globalProducts = datosPrueba;
+            renderTable(globalProducts);
+        } else {
+            try {
+                const response = await fetch(hojaCSV);
+                const data = await response.text();
+                globalProducts = parseCSV(data);
+                renderTable(globalProducts);
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loading').innerText = "Error cargando. Usando modo prueba.";
+                globalProducts = datosPrueba;
+                renderTable(globalProducts);
+            }
+        }
+    };
+
+    // 2. LEER CSV
+    function parseCSV(csvText) {
+        const lines = csvText.split('\n');
+        const products = [];
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line) {
+                const parts = line.split(','); 
+                if(parts.length >= 2) {
+                    products.push({
+                        nombre: parts[0],
+                        precio: parseFloat(parts[1]),
+                        descripcion: parts[2] || ''
+                    });
+                }
+            }
+        }
+        return products;
+    }
+
+    // 3. DIBUJAR TABLA
+    function renderTable(list) {
+        const tbody = document.getElementById('product-list-body');
+        document.getElementById('loading').style.display = 'none';
+        
+        tbody.innerHTML = list.map((p, index) => `
+            <tr>
+                <td>
+                    <strong>${p.nombre}</strong><br>
+                    <small style="color:#777;">${p.descripcion}</small>
+                </td>
+                <td>$${p.precio}</td>
+                <td>
+                    <input type="number" id="qty-${index}" class="qty-input" value="1" min="1">
+                </td>
+                <td>
+                    <button class="add-btn" onclick="addToCart(${index})">Agregar</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    // --- LÓGICA DE DESCUENTOS ---
+    function calcularPrecioFinal(nombre, precioBase, cantidad) {
+        const nombreMin = nombre.toLowerCase();
+        
+        // REGLA: Si es Pistache Y son 20 o más
+        if (nombreMin.includes("pistache") && cantidad >= 20) {
+            return {
+                precioUnitario: precioBase * (1 - 0.094), // Descuento 9.4%
+                tieneDescuento: true
+            };
+        }
+        return {
+            precioUnitario: precioBase,
+            tieneDescuento: false
+        };
+    }
+
+    // 4. AGREGAR AL CARRITO
+    function addToCart(index) {
+        const product = globalProducts[index];
+        const qtyInput = document.getElementById(`qty-${index}`);
+        const quantityToAdd = parseInt(qtyInput.value);
+
+        if(quantityToAdd < 1) return;
+
+        const existingItemIndex = cart.findIndex(item => item.name === product.nombre);
+
+        if(existingItemIndex !== -1) {
+            cart[existingItemIndex].qty += quantityToAdd;
+            const calculo = calcularPrecioFinal(product.nombre, product.precio, cart[existingItemIndex].qty);
+            cart[existingItemIndex].unitPrice = calculo.precioUnitario;
+            cart[existingItemIndex].discounted = calculo.tieneDescuento;
+            cart[existingItemIndex].subtotal = cart[existingItemIndex].qty * calculo.precioUnitario;
+        } else {
+            const calculo = calcularPrecioFinal(product.nombre, product.precio, quantityToAdd);
+            cart.push({
+                name: product.nombre,
+                originalPrice: product.precio, 
+                unitPrice: calculo.precioUnitario,
+                qty: quantityToAdd,
+                subtotal: quantityToAdd * calculo.precioUnitario,
+                discounted: calculo.tieneDescuento
+            });
+        }
+        qtyInput.value = 1; 
+        updateCartUI();
+    }
+
+    // 5. ACTUALIZAR CARRITO
+    function updateCartUI() {
+        const container = document.getElementById('cart-content');
+        const totalDisplay = document.getElementById('total-display');
+        
+        if(cart.length === 0) {
+            container.innerHTML = "Aún no has agregado productos.";
+            totalDisplay.innerText = "0.00";
+            return;
+        }
+
+        let html = '<ul style="padding-left:20px; margin:0;">';
+        let grandTotal = 0;
+
+        cart.forEach((item, idx) => {
+            grandTotal += item.subtotal;
+            const etiquetaDescuento = item.discounted 
+                ? `<span style="color:#28a745; font-weight:bold; font-size:0.8em;">(Desc. Mayoreo 9.4%)</span>` 
+                : '';
+
+            html += `
+                <li style="margin-bottom: 8px; border-bottom:1px solid #f0f0f0; padding-bottom:5px;">
+                    <strong>${item.name}</strong> <br>
+                    Cant: ${item.qty} | $${item.subtotal.toFixed(2)} ${etiquetaDescuento}
+                    <a href="#" onclick="removeItem(${idx})" style="color:red; float:right; text-decoration:none; font-size:0.9em;">[X]</a>
+                </li>
+            `;
+        });
+        html += '</ul>';
+
+        container.innerHTML = html;
+        totalDisplay.innerText = grandTotal.toFixed(2);
+    }
+
+    function removeItem(index) {
+        cart.splice(index, 1);
+        updateCartUI();
+    }
+
+    // 6. ENVIAR PEDIDO
+    function sendOrder(e) {
+        e.preventDefault();
+        if(cart.length === 0) { alert("Tu carrito está vacío."); return; }
+
+        const btn = document.getElementById('submit-btn');
+        const msg = document.getElementById('status-message');
+        
+        btn.disabled = true; 
+        btn.innerText = "Enviando...";
+        msg.style.display = 'none';
+
+        const itemsString = cart.map(i => {
+            let info = `${i.name} (x${i.qty})`;
+            if(i.discounted) info += " [DESC APLICADO]";
+            return info;
+        }).join(", ");
+        
+        const finalTotal = document.getElementById('total-display').innerText;
+
+        const formData = {
+            nombre: document.getElementById('nombre').value,
+            direccion: document.getElementById('direccion').value,
+            fechaEntrega: document.getElementById('fecha').value,
+            items: itemsString,
+            total: finalTotal
+        };
+
+        fetch(scriptURL, {
+            method: 'POST',
+            body: JSON.stringify(formData)
+        })
+        .then(res => {
+            msg.className = "success";
+            msg.innerText = "✅ ¡Pedido enviado correctamente!";
+            msg.style.display = "block";
+            cart = []; updateCartUI();
+            document.getElementById('order-form').reset();
+            btn.innerText = "Confirmar Pedido";
+            btn.disabled = false;
+        })
+        .catch(err => {
+            console.error(err);
+            msg.className = "error";
+            msg.innerText = "❌ Error de conexión.";
+            msg.style.display = "block";
+            btn.innerText = "Reintentar";
+            btn.disabled = false;
+        });
+    }
+</script>
+</body>
+</html>
