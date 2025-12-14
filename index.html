@@ -9,7 +9,31 @@
         body { font-family: 'Helvetica', sans-serif; background: var(--bg); color: #333; margin: 0; padding: 20px; }
         .container { max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         
-        header { text-align: center; margin-bottom: 30px; }
+        header { /* REEMPLAZA TU BLOQUE "header" ANTIGUO CON ESTE NUEVO */
+            display: flex;            /* Pone los elementos en fila (lado a lado) */
+            align-items: center;      /* Los centra verticalmente */
+            justify-content: flex-start; /* Alinea todo a la izquierda */
+            gap: 20px;                /* Espacio entre el logo y el texto */
+            text-align: left;         /* Texto alineado a la izquierda */
+            margin-bottom: 30px; 
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee; /* Una línea sutil separadora */
+        }
+
+        .logo {
+            width: 100px;             /* Tamaño del logo */
+            height: auto;
+            border-radius: 8px;       /* Bordes redondeados */
+            object-fit: cover;
+        }
+
+        /* ESTO ES IMPORTANTE: Para que en celulares se vea bien (uno arriba del otro) */
+        @media (max-width: 600px) {
+            header {
+                flex-direction: column; /* Cambia a columna en celular */
+                text-align: center;     /* Centra el texto en celular */
+            }
+        }}
         h1 { color: var(--primary); margin-bottom: 5px; }
         
         /* ESTILOS DE LA TABLA (LISTA) */
